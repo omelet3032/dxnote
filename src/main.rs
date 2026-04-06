@@ -1,7 +1,15 @@
+use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 
 fn main() {
-    dioxus::launch(App);
+    let window_attrs = WindowBuilder::new()
+        .with_always_on_top(false) // 여기서 명시적으로 false 설정
+        .with_title("dxnote");
+
+    // 2. Config에 해당 설정을 넣어서 실행합니다.
+    LaunchBuilder::desktop()
+        .with_cfg(Config::new().with_window(window_attrs))
+        .launch(App);
 }
 
 #[component]
@@ -10,14 +18,30 @@ fn App() -> Element {
     let mut text_value = use_signal(|| String::new());
 
     rsx! {
-    div {
-        textarea {
-            style: "resize: none",
-            value: "{text_value}",
-            // 값이 변할 때마다 상태 업데이트
-            oninput: move |event| text_value.set(event.value())
-        }
+        div {
+            textarea {
+                // style: "resize: none",
+                // style: "resize: none; width: 100%; height: 300px;",
+                style: "
+                width: 100vw;
+                height: 100vh;
+                margin: 0;
+                padding: 40px;
 
-    }
+                border: none;
+                outline: none;
+                resize: none;
+
+                font-size: 20px;
+                font-family: monospace;
+                line-height: 1.6;
+
+                box-sizing: border-box;
+                ",
+                value: "{text_value}",
+                // 값이 변할 때마다 상태 업데이트
+                oninput: move |event| text_value.set(event.value()),
+            }
+        }
     }
 }
