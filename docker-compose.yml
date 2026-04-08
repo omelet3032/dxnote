@@ -1,0 +1,20 @@
+services:
+  # db:
+  postgres:
+    image: postgres:17
+    container_name: practice-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # 이 줄을 추가
+    restart: unless-stopped
+
+volumes:
+  pgdata:

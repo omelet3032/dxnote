@@ -1,0 +1,21 @@
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+.textarea {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 40px;
+
+    border: none;
+    outline: none;
+    resize: none;
+
+    font-size: 20px;
+    font-family: monospace;
+    line-height: 1.6;
+
+    box-sizing: border-box;
+}
