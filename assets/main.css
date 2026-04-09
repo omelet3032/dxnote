@@ -19,3 +19,24 @@ html, body {
 
     box-sizing: border-box;
 }
+/* 버튼 컨테이너를 화면 우측 하단에 고정 */
+.save-button-container {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 10; /* 메모장보다 위에 오도록 */
+}
+
+.save-button-container button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.save-button-container button:hover {
+    background-color: #0056b3;
+}
