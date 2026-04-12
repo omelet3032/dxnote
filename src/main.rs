@@ -53,6 +53,11 @@ fn Button() -> Element {
             button {
                 onclick: move |_| {
                     println!("click");
+                    /* 
+                        1. save를 누르면
+                        2. insert 쿼리가 실행되면서
+                        3.
+                     */
                 },
                 "save",
             }
