@@ -2,7 +2,7 @@ services:
   # db:
   postgres:
     image: postgres:17
-    container_name: practice-postgres
+    # container_name: practice-postgres # 전역 네임스페이스이기에 사용하지않음 권장
     env_file:
       - .env
     # environment:
