@@ -8,6 +8,7 @@ fn main() {
     let window_attrs = WindowBuilder::new()
         .with_always_on_top(false) 
         .with_title("dxnote")
+        .with_visible(true)
         .with_focused(true); // 포커스 동작 보정 1순위 정적
 
 
@@ -21,13 +22,13 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-   let window = use_window();
+//    let window = use_window();
 
-    // 앱이 처음 렌더링될 때 딱 한 번 실행됩니다.
-    use_effect(move || {
-        // 창을 전면으로 가져오고 포커스를 요청합니다.
-        window.set_focus();
-    }); // 포커스 동작 보정 2순위
+//     // 앱이 처음 렌더링될 때 딱 한 번 실행됩니다.
+//     use_effect(move || {
+//         // 창을 전면으로 가져오고 포커스를 요청합니다.
+//         window.set_focus();
+//     }); // 포커스 동작 보정 2순위
 
     rsx! {
         Note {}
