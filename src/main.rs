@@ -3,7 +3,8 @@ use dioxus::prelude::*;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
-fn main() {
+#[tokio::main]
+async fn main() {
 
     let window_attrs = WindowBuilder::new()
         .with_always_on_top(false) 
@@ -20,8 +21,9 @@ fn main() {
         .launch(App);
 }
 
+
 #[component]
-fn App() -> Element {
+async fn App() -> Element {
 //    let window = use_window();
 
 //     // 앱이 처음 렌더링될 때 딱 한 번 실행됩니다.
@@ -29,6 +31,10 @@ fn App() -> Element {
 //         // 창을 전면으로 가져오고 포커스를 요청합니다.
 //         window.set_focus();
 //     }); // 포커스 동작 보정 2순위
+
+    // 1. 데이터베이스 커넥션 풀 생성
+    let database_url = "postgres://postgres:password@10.0.0.1:5432/dxnote";
+    
 
     rsx! {
         Note {}
@@ -72,9 +78,6 @@ fn Button() -> Element {
                 "save",
             }
          }
-         /* 
-            onclick save
-                "insert ~"
-         */
+         
     }
 }
