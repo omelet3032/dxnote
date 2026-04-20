@@ -1,52 +1,80 @@
-use dioxus::desktop::{Config, WindowBuilder, use_window};
+use dioxus::desktop::{use_window, Config, WindowBuilder};
 use dioxus::prelude::*;
+use dotenvy::dotenv;
+use sqlx::postgres::PgPoolOptions;
+use chrono::Utc;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 #[tokio::main]
-async fn main() {
+// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), sqlx::Error> {
 
+    dotenv().ok(); // .env 파일을 읽어옵니다.
+
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL이 설정되지 않았습니다.");
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await?;
+
+    println!("DB 연결 성공!");
+
+    // 3. INSERT 쿼리 날리기
+    let note_content = "Rust에서 보낸 첫 번째 메모입니다.";
+
+    // sqlx::query! 매크로를 사용하면 컴파일 타임에 SQL 검사를 해줍니다.
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO notes (content, created_at, updated_at)
+        VALUES ($1, $2, $3)
+        RETURNING id
+        "#,
+        note_content,
+        Utc::now(), // 현재 시간
+        Utc::now()
+    )
+    .fetch_one(&pool) // 방금 넣은 ID를 가져오기 위해 fetch_one 사용
+    .await?;
+
+    println!("성공적으로 저장되었습니다. 생성된 ID: {}", result.id);
+
+    // 앱 실행시 화면 설정
     let window_attrs = WindowBuilder::new()
-        .with_always_on_top(false) 
+        .with_always_on_top(false)
         .with_title("dxnote")
         .with_visible(true)
         .with_focused(true); // 포커스 동작 보정 1순위 정적
 
-
     LaunchBuilder::desktop()
-        .with_cfg(
-            Config::new()
-                .with_window(window_attrs)
-        )
+        .with_cfg(Config::new().with_window(window_attrs))
         .launch(App);
+
+    Ok(())
 }
 
-
 #[component]
-async fn App() -> Element {
-//    let window = use_window();
+fn App() -> Element {
+    //    let window = use_window();
 
-//     // 앱이 처음 렌더링될 때 딱 한 번 실행됩니다.
-//     use_effect(move || {
-//         // 창을 전면으로 가져오고 포커스를 요청합니다.
-//         window.set_focus();
-//     }); // 포커스 동작 보정 2순위
-
-    // 1. 데이터베이스 커넥션 풀 생성
-    let database_url = "postgres://postgres:password@10.0.0.1:5432/dxnote";
-    
+    //     // 앱이 처음 렌더링될 때 딱 한 번 실행됩니다.
+    //     use_effect(move || {
+    //         // 창을 전면으로 가져오고 포커스를 요청합니다.
+    //         window.set_focus();
+    //     }); // 포커스 동작 보정 2순위
 
     rsx! {
         Note {}
         Button {}
     }
-   
 }
 
 #[component]
 fn Note() -> Element {
-   let mut text_value = use_signal(|| String::new());
-    
+    let mut text_value = use_signal(|| String::new());
+
     rsx! {
         document::Link { rel: "stylesheet", href: MAIN_CSS,}
         div {
@@ -57,7 +85,7 @@ fn Note() -> Element {
                 },
             }
         }
-    } 
+    }
 }
 
 #[component]
@@ -69,7 +97,7 @@ fn Button() -> Element {
             button {
                 onclick: move |_| {
                     println!("click");
-                    /* 
+                    /*
                         1. save를 누르면
                         2. insert 쿼리가 실행되면서
                         3.
@@ -78,6 +106,6 @@ fn Button() -> Element {
                 "save",
             }
          }
-         
+
     }
 }
