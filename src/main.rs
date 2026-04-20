@@ -1,27 +1,17 @@
+use std::future::Future;
+
+use chrono::Utc;
 use dioxus::desktop::{use_window, Config, WindowBuilder};
 use dioxus::prelude::*;
 use dotenvy::dotenv;
+use sqlx::Postgres;
 use sqlx::postgres::PgPoolOptions;
-use chrono::Utc;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), sqlx::Error> {
-
-    dotenv().ok(); // .env 파일을 읽어옵니다.
-
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL이 설정되지 않았습니다.");
-
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await?;
-
-    println!("DB 연결 성공!");
-
     // 3. INSERT 쿼리 날리기
     let note_content = "Rust에서 보낸 첫 번째 메모입니다.";
 
@@ -41,7 +31,24 @@ async fn main() -> Result<(), sqlx::Error> {
 
     println!("성공적으로 저장되었습니다. 생성된 ID: {}", result.id);
 
-    // 앱 실행시 화면 설정
+    screen_config();
+    Ok(())
+}
+
+async fn connect_db() -> Result<sqlx::Pool<Postgres>, sqlx::Error> {
+    dotenv().ok(); // .env 파일을 읽어옵니다.
+
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL이 설정되지 않았습니다.");
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url).await;
+
+    println!("DB 연결 성공!");
+    pool
+}
+
+fn screen_config() {
     let window_attrs = WindowBuilder::new()
         .with_always_on_top(false)
         .with_title("dxnote")
@@ -51,20 +58,10 @@ async fn main() -> Result<(), sqlx::Error> {
     LaunchBuilder::desktop()
         .with_cfg(Config::new().with_window(window_attrs))
         .launch(App);
-
-    Ok(())
 }
 
 #[component]
 fn App() -> Element {
-    //    let window = use_window();
-
-    //     // 앱이 처음 렌더링될 때 딱 한 번 실행됩니다.
-    //     use_effect(move || {
-    //         // 창을 전면으로 가져오고 포커스를 요청합니다.
-    //         window.set_focus();
-    //     }); // 포커스 동작 보정 2순위
-
     rsx! {
         Note {}
         Button {}
