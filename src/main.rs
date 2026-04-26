@@ -1,11 +1,9 @@
-use std::future::Future;
-
 use chrono::Utc;
-use dioxus::desktop::{use_window, Config, WindowBuilder};
+use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 use dotenvy::dotenv;
-use sqlx::Postgres;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgPool};
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
@@ -14,38 +12,59 @@ const MAIN_CSS: Asset = asset!("/assets/main.css");
 async fn main() -> Result<(), sqlx::Error> {
     // 3. INSERT 쿼리 날리기
     let note_content = "Rust에서 보낸 첫 번째 메모입니다.";
+    // let pool = connect_db().await;
 
-    // sqlx::query! 매크로를 사용하면 컴파일 타임에 SQL 검사를 해줍니다.
-    let result = sqlx::query!(
-        r#"
+    if let Ok(pool) = connect_db().await {
+        let result = sqlx::query!(
+            r#"
         INSERT INTO notes (content, created_at, updated_at)
         VALUES ($1, $2, $3)
         RETURNING id
         "#,
-        note_content,
-        Utc::now(), // 현재 시간
-        Utc::now()
-    )
-    .fetch_one(&pool) // 방금 넣은 ID를 가져오기 위해 fetch_one 사용
-    .await?;
+            note_content,
+            Utc::now(), // 현재 시간
+            Utc::now()
+        )
+        .fetch_one(&pool) // 방금 넣은 ID를 가져오기 위해 fetch_one 사용
+        .await?;
+    
+        println!("아이디 : {}",  result.id);
+        println!("데이터 저장 성공");
+    }
 
-    println!("성공적으로 저장되었습니다. 생성된 ID: {}", result.id);
+    // sqlx::query! 매크로를 사용하면 컴파일 타임에 SQL 검사를 해줍니다.
+    // let result = sqlx::query!(
+    //     r#"
+    //     INSERT INTO notes (content, created_at, updated_at)
+    //     VALUES ($1, $2, $3)
+    //     RETURNING id
+    //     "#,
+    //     note_content,
+    //     Utc::now(), // 현재 시간
+    //     Utc::now()
+    // )
+    // .fetch_one(&pool) // 방금 넣은 ID를 가져오기 위해 fetch_one 사용
+    // .await?;
+
+    // println!("성공적으로 저장되었습니다. 생성된 ID: {}", result.id);
 
     screen_config();
     Ok(())
 }
 
-async fn connect_db() -> Result<sqlx::Pool<Postgres>, sqlx::Error> {
+// async fn connect_db() -> Result<sqlx::Pool<Postgres>, sqlx::Error> {
+async fn connect_db() -> Result<PgPool, sqlx::Error> {
     dotenv().ok(); // .env 파일을 읽어옵니다.
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL이 설정되지 않았습니다.");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect(&database_url).await;
+        .connect(&database_url)
+        .await?;
 
     println!("DB 연결 성공!");
-    pool
+    Ok(pool)
 }
 
 fn screen_config() {
