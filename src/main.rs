@@ -3,25 +3,18 @@ use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 use dotenvy::dotenv;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Executor, PgPool, Pool, Postgres};
+use sqlx::PgPool;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), sqlx::Error> {
-    // 3. INSERT 쿼리 날리기
-    // let note_content = "Rust에서 보낸 첫 번째 메모입니다.";
 
     let pool = connect_db().await.map_err(|e| {
         eprintln!("DB 연동 실패");
         e
     })?;
-
-    // insert_data(note_content, pool.clone()).await.map_err(|e| {
-    //     eprintln!("데이터 삽입 실패");
-    //     e
-    // })?;
 
     let window_attrs = screen_config();
 
@@ -35,7 +28,6 @@ async fn main() -> Result<(), sqlx::Error> {
 
 // 연습용 함수
 async fn insert_data(note_content:String, pool: PgPool) -> Result<(), sqlx::Error> {
-    // let note_content = "Rust에서 보낸 첫 번째 메모입니다.";
 
     let result = sqlx::query!(
         r#"
@@ -81,28 +73,16 @@ fn screen_config() -> WindowBuilder {
 
 #[component]
 fn App() -> Element {
-    // let pool = use_context::<sqlx::PgPool>();
-
-    // let spawn_insert = move |_: MouseEvent| {
-    //     spawn(async move {
-    //         // 여기서 pool을 사용하여 DB 작업 수행
-    //         // insert_data("새 메모", pool).await;
-    //         insert_data(pool.clone()).await.map_err(|e| {
-    //             eprintln!("데이터 삽입 실패");
-    //             e
-    //         });
-    //     });
-    // };
 
     rsx! {
         Note {}
-        // Button {}
     }
 }
 
 #[component]
 fn Note() -> Element {
     let mut text_value = use_signal(|| String::new());
+    
     let pool = use_context::<sqlx::PgPool>();
 
     let on_save = move |_| {
@@ -143,24 +123,3 @@ fn Note() -> Element {
     }
 }
 
-// #[component]
-// fn Button() -> Element {
-//     rsx! {
-//          div {
-//             class: "save-button-container",
-
-//             button {
-//                 onclick: move |_| {
-//                     println!("click");
-//                     /*
-//                         1. save를 누르면
-//                         2. insert 쿼리가 실행되면서
-//                         3.
-//                      */
-//                 },
-//                 "save",
-//             }
-//          }
-
-//     }
-// }
