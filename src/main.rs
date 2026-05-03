@@ -27,7 +27,7 @@ async fn main() -> Result<(), sqlx::Error> {
 }
 
 // 연습용 함수
-async fn insert_data(note_content:String, pool: PgPool) -> Result<(), sqlx::Error> {
+async fn insert_data(note_content:String, pool: PgPool) -> Result<i64, sqlx::Error> {
 
     let result = sqlx::query!(
         r#"
@@ -44,8 +44,9 @@ async fn insert_data(note_content:String, pool: PgPool) -> Result<(), sqlx::Erro
 
     println!("아이디 : {}", result.id);
     println!("데이터 저장 성공");
-    Ok(())
+    Ok(result.id)
 }
+
 // async fn connect_db() -> Result<sqlx::Pool<Postgres>, sqlx::Error> {
 async fn connect_db() -> Result<PgPool, sqlx::Error> {
     dotenv().ok(); // .env 파일을 읽어옵니다.
@@ -85,24 +86,6 @@ fn Note() -> Element {
     
     let pool = use_context::<sqlx::PgPool>();
 
-    // use_resource는 의존성(text_value)이 변할 때마다 클로저를 다시 실행합니다.
-   /*  let _save_resource = use_resource(move || {
-        let current_text = text_value.read().clone();
-        let pool_cloned = pool.clone();
-
-        async move {
-            if current_text.is_empty() { return; }
-
-            // 1. 디바운스: 700ms 동안 대기 (사용자가 타이핑을 멈출 때까지 기다림)
-            tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-
-            // 2. 실제 DB 저장
-            match insert_data(current_text, pool_cloned).await {
-                Ok(_) => println!("실시간 자동 저장 성공"),
-                Err(e) => eprintln!("자동 저장 실패: {:?}", e),
-            }
-        }
-    }); */
 
     let _save_resource = use_resource(move || {
         let current_text = text_value.read().clone();
