@@ -47,6 +47,23 @@ async fn insert_data(note_content:String, pool: PgPool) -> Result<i64, sqlx::Err
     Ok(result.id)
 }
 
+// async fn update_data(note_content:String, pool:PgPool, id:i64) -> Result<(), sqlx::Error> {
+async fn update_data(id:i64, note_content:String, pool:PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        UPDATE notes
+        SET content = $1,
+            updated_at = NOW()
+        WHERE id = $2
+        "#,
+        note_content,
+        id
+    ).execute(&pool).await?;
+
+    println!("ID {} 업데이트 성공", id);
+    Ok(())
+}
+
 // async fn connect_db() -> Result<sqlx::Pool<Postgres>, sqlx::Error> {
 async fn connect_db() -> Result<PgPool, sqlx::Error> {
     dotenv().ok(); // .env 파일을 읽어옵니다.
@@ -85,8 +102,11 @@ fn Note() -> Element {
     let mut text_value = use_signal(|| String::new());
     
     let pool = use_context::<sqlx::PgPool>();
+    let current_note_id = use_signal(|| None::<i64>);
 
-
+    let mut id_state = current_note_id;
+    let current_id_opt = *id_state.read();
+    
     let _save_resource = use_resource(move || {
         let current_text = text_value.read().clone();
         let pool_cloned = pool.clone();
@@ -99,11 +119,33 @@ fn Note() -> Element {
             // 1. 디바운스: 700ms동안 대기 (사용자가 타이핑을 멈출때까지 기다림)
             tokio::time::sleep(std::time::Duration::from_millis(700)).await;
 
-            // 2. 실제 DB 저장
-            match insert_data(current_text, pool_cloned).await {
-                Ok(_) => println!("실시간 자동 저장 성공"),
-                Err(e) => eprintln!("자동 저장 실패: {:?}", e),
+            // 3. ID가 이미 있는지 확인
+            if let Some(existing_id) = current_id_opt {
+                // 이미 ID가 있다면 UPDATE 실행
+                match update_data(existing_id, current_text, pool_cloned).await {
+                    Ok(_) => println!("업데이트 성공 (ID: {})", existing_id),
+                    Err(e) => eprintln!("업데이트 실패: {:?}", e),
+                }
+            } else {
+                // ID가 없다면 새로 INSERT
+                if let Ok(new_id) = insert_data(current_text, pool_cloned).await {
+                    println!("최초 저장 성공 (ID: {})", new_id);
+                    // 4. 여기서 추출된 new_id를 Signal에 저장!
+                    id_state.set(Some(new_id));
+                }
             }
+            // 2. 실제 DB 저장
+            // match insert_data(current_text, pool_cloned).await {
+            //     Ok(_) => println!("실시간 자동 저장 성공"),
+            //     Err(e) => eprintln!("자동 저장 실패: {:?}", e),
+            // }
+
+            // if let Ok(id) = insert_data(current_text, pool_cloned).await {
+            //     println!("실시간 자동 저장 성공");
+                 
+            // } else {
+            //     println!("자동 저장 실패");
+            // }
         }
     });
 
