@@ -97,56 +97,147 @@ fn App() -> Element {
     }
 }
 
+// 메모 하나를 표현할 구조체 (sqlx 결과와 매칭)
+#[derive(Clone, PartialEq, Debug)]
+struct NoteSummary {
+    id: i64,
+    content: String,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+
 #[component]
 fn Note() -> Element {
     let mut text_value = use_signal(|| String::new());
-    
     let pool = use_context::<sqlx::PgPool>();
-    let current_note_id = use_signal(|| None::<i64>);
-
-    let mut id_state = current_note_id;
-    let current_id_opt = *id_state.read();
+    let mut current_note_id = use_signal(|| None::<i64>);
     
+    let list_pool = pool.clone();
+    let save_pool = pool.clone();
+
+    // 리스트 리소스 (변수명 앞의 _ 제거하여 나중에 restart 호출 가능하게 함)
+    let mut list_resource = use_resource(move || {
+        let pool = list_pool.clone();
+        async move {
+            sqlx::query_as!(
+                NoteSummary,
+                r#"
+                SELECT 
+                    id, 
+                    content, 
+                    updated_at AS "updated_at!" 
+                FROM notes 
+                ORDER BY updated_at DESC
+                "#
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap_or_default()
+        }
+    });
+
     let _save_resource = use_resource(move || {
         let current_text = text_value.read().clone();
-        let pool_cloned = pool.clone();
+        let pool_cloned = save_pool.clone();
+        // ID 시그널 자체를 넘겨서 내부에서 최신 값을 읽게 함
+        let mut id_state = current_note_id;
 
         async move {
-            if current_text.is_empty() {
-                return;
-            }
-
-            // 1. 디바운스: 700ms동안 대기 (사용자가 타이핑을 멈출때까지 기다림)
+            if current_text.is_empty() { return; }
             tokio::time::sleep(std::time::Duration::from_millis(700)).await;
 
-            // 3. ID가 이미 있는지 확인
-            if let Some(existing_id) = current_id_opt {
-                // 이미 ID가 있다면 UPDATE 실행
-                match update_data(existing_id, current_text, pool_cloned).await {
-                    Ok(_) => println!("업데이트 성공 (ID: {})", existing_id),
-                    Err(e) => eprintln!("업데이트 실패: {:?}", e),
+            // 잠에서 깨어난 직후에 '최신' ID를 읽음 (매우 중요!)
+            let current_id = *id_state.read();
+
+            if let Some(existing_id) = current_id {
+                if let Ok(_) = update_data(existing_id, current_text, pool_cloned).await {
+                    println!("업데이트 성공");
+                    list_resource.restart(); // 리스트 갱신
                 }
             } else {
-                // ID가 없다면 새로 INSERT
                 if let Ok(new_id) = insert_data(current_text, pool_cloned).await {
-                    println!("최초 저장 성공 (ID: {})", new_id);
-                    // 4. 여기서 추출된 new_id를 Signal에 저장!
+                    println!("최초 저장 성공");
                     id_state.set(Some(new_id));
+                    list_resource.restart(); // 리스트 갱신
                 }
             }
         }
     });
 
+    // rsx! 앞에 아무것도 붙이지 않고 마지막 줄에 배치
     rsx! {
-        document::Link { rel: "stylesheet", href: MAIN_CSS,}
-        div {
-            textarea {
-                class: "textarea",
-                oninput: move |event| {
-                text_value.set(event.value());
-                },
+        document::Link { rel: "stylesheet", href: MAIN_CSS }
+        div { class: "app-container",
+            div { class: "sidebar",
+                for note in list_resource.value().cloned().unwrap_or_default() {
+                    // 복잡한 연산은 미리 변수로!
+                    {
+                        let time_str = note.updated_at
+                            .with_timezone(&chrono::Local)
+                            .format("%m/%d %H:%M")
+                            .to_string();
+                        let title = note.content.lines().next().unwrap_or("Empty");
+
+                        rsx! {
+                            div { 
+                                class: "note-item",
+                                onclick: move |_| {
+                                    text_value.set(note.content.clone());
+                                    current_note_id.set(Some(note.id));
+                                },
+                                b { "{title}" }
+                                p { 
+                                    style: "font-size: 0.8em; color: gray;",
+                                    "{time_str}" 
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            div { class: "main-content",
+                textarea {
+                    class: "textarea",
+                    value: "{text_value}",
+                    oninput: move |event| {
+                        text_value.set(event.value());
+                    },
+                }
             }
         }
-    }
-}
+    } // <--- 여기에 세미콜론(;)이 절대 없어야 합니다!
 
+    // return rsx! {
+    //     document::Link { rel: "stylesheet", href: MAIN_CSS }
+    //     div { 
+    //         class: "app-container",
+    //         div { class: "sidebar",
+    //             for note in list_resource.value().cloned().unwrap_or_default() {
+    //                 div { 
+    //                     class: "note-item",
+    //                     onclick: move |_| {
+    //                         text_value.set(note.content.clone());
+    //                         current_note_id.set(Some(note.id));
+    //                     },
+    //                     // take(20)을 제거했습니다.
+    //                     b { "{note.content.lines().next().unwrap_or(\"Empty\")}" }
+    //                     p { 
+    //                         style: "font-size: 0.8em; color: gray;",
+    //                         "{note.updated_at.with_timezone(&chrono::Local).format(\"%m/%d %H:%M\")}" 
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         div { class: "main-content",
+    //             textarea {
+    //                 class: "textarea",
+    //                 value: "{text_value}",
+    //                 oninput: move |event| {
+    //                     text_value.set(event.value());
+    //                 },
+    //             }
+    //         }
+    //     }
+    // }
+}
