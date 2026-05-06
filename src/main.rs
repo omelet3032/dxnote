@@ -134,39 +134,9 @@ fn Note() -> Element {
                     id_state.set(Some(new_id));
                 }
             }
-            // 2. 실제 DB 저장
-            // match insert_data(current_text, pool_cloned).await {
-            //     Ok(_) => println!("실시간 자동 저장 성공"),
-            //     Err(e) => eprintln!("자동 저장 실패: {:?}", e),
-            // }
-
-            // if let Ok(id) = insert_data(current_text, pool_cloned).await {
-            //     println!("실시간 자동 저장 성공");
-                 
-            // } else {
-            //     println!("자동 저장 실패");
-            // }
         }
     });
 
-/*     let on_save = move |_| {
-        let current_text = text_value.read().clone();
-        let pool_cloned = pool.clone();
-
-        spawn(async move {
-            if current_text.is_empty() {
-                println!("내용이 비어있어 저장하지 않습니다.");
-                return;
-            }
-
-            // insert_data 함수가 이제 text를 인자로 받도록 수정되어야 합니다.
-            match insert_data(current_text, pool_cloned).await {
-                Ok(_) => println!("DB 저장 성공!"),
-                Err(e) => eprintln!("DB 저장 실패: {:?}", e),
-            }
-        });
-    };
- */
     rsx! {
         document::Link { rel: "stylesheet", href: MAIN_CSS,}
         div {
@@ -176,13 +146,6 @@ fn Note() -> Element {
                 text_value.set(event.value());
                 },
             }
-            // div {
-            //     class: "save-button-container",
-            //     button {
-            //         onclick: on_save,
-            //         "save"
-            //     }
-            // }
         }
     }
 }
