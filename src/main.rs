@@ -53,11 +53,12 @@ async fn update_data(id:i64, note_content:String, pool:PgPool) -> Result<(), sql
         r#"
         UPDATE notes
         SET content = $1,
-            updated_at = NOW()
+        updated_at = CASE WHEN content <> $1 THEN NOW() ELSE updated_at END
         WHERE id = $2
         "#,
         note_content,
         id
+        // updated_at = NOW()
     ).execute(&pool).await?;
 
     println!("ID {} 업데이트 성공", id);
@@ -123,9 +124,9 @@ fn Note() -> Element {
                 NoteSummary,
                 r#"
                 SELECT 
-                    id, 
-                    content, 
-                    updated_at AS "updated_at!" 
+                id, 
+                content, 
+                updated_at AS "updated_at!" 
                 FROM notes 
                 ORDER BY updated_at DESC
                 "#
@@ -152,6 +153,10 @@ fn Note() -> Element {
             if let Some(existing_id) = current_id {
                 if let Ok(_) = update_data(existing_id, current_text, pool_cloned).await {
                     println!("업데이트 성공");
+                    /* 
+                        이 부분에서 로직 추가가 필요할 듯
+                        바로 list_resource.restart()를 할 게 아니라 내용이 추가된데 있으면 restart()해야함
+                     */
                     list_resource.restart(); // 리스트 갱신
                 }
             } else {
@@ -167,8 +172,11 @@ fn Note() -> Element {
     // rsx! 앞에 아무것도 붙이지 않고 마지막 줄에 배치
     rsx! {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
-        div { class: "app-container",
-            div { class: "sidebar",
+        div { 
+            class: "app-container",
+            
+            div { 
+                class: "sidebar",
                 for note in list_resource.value().cloned().unwrap_or_default() {
                     // 복잡한 연산은 미리 변수로!
                     {
@@ -182,6 +190,9 @@ fn Note() -> Element {
                             div { 
                                 class: "note-item",
                                 onclick: move |_| {
+                                    /* 
+                                        사용자가 단순 클릭만 했을땐 변동이 있어선 안된다.    
+                                     */
                                     text_value.set(note.content.clone());
                                     current_note_id.set(Some(note.id));
                                 },
@@ -195,7 +206,9 @@ fn Note() -> Element {
                     }
                 }
             }
-            div { class: "main-content",
+            
+            div { 
+                class: "main-content",
                 textarea {
                     class: "textarea",
                     value: "{text_value}",
@@ -205,39 +218,5 @@ fn Note() -> Element {
                 }
             }
         }
-    } // <--- 여기에 세미콜론(;)이 절대 없어야 합니다!
-
-    // return rsx! {
-    //     document::Link { rel: "stylesheet", href: MAIN_CSS }
-    //     div { 
-    //         class: "app-container",
-    //         div { class: "sidebar",
-    //             for note in list_resource.value().cloned().unwrap_or_default() {
-    //                 div { 
-    //                     class: "note-item",
-    //                     onclick: move |_| {
-    //                         text_value.set(note.content.clone());
-    //                         current_note_id.set(Some(note.id));
-    //                     },
-    //                     // take(20)을 제거했습니다.
-    //                     b { "{note.content.lines().next().unwrap_or(\"Empty\")}" }
-    //                     p { 
-    //                         style: "font-size: 0.8em; color: gray;",
-    //                         "{note.updated_at.with_timezone(&chrono::Local).format(\"%m/%d %H:%M\")}" 
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         div { class: "main-content",
-    //             textarea {
-    //                 class: "textarea",
-    //                 value: "{text_value}",
-    //                 oninput: move |event| {
-    //                     text_value.set(event.value());
-    //                 },
-    //             }
-    //         }
-    //     }
-    // }
+    }
 }
