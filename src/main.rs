@@ -27,7 +27,7 @@ async fn main() -> Result<(), sqlx::Error> {
 }
 
 // 연습용 함수
-async fn insert_data(note_content:String, pool: PgPool) -> Result<i64, sqlx::Error> {
+async fn insert_data(note_content:&str, pool: PgPool) -> Result<i64, sqlx::Error> {
 
     let result = sqlx::query!(
         r#"
@@ -48,7 +48,7 @@ async fn insert_data(note_content:String, pool: PgPool) -> Result<i64, sqlx::Err
 }
 
 // async fn update_data(note_content:String, pool:PgPool, id:i64) -> Result<(), sqlx::Error> {
-async fn update_data(id:i64, note_content:String, pool:PgPool) -> Result<(), sqlx::Error> {
+async fn update_data(id:i64, note_content:&str, pool:PgPool) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         UPDATE notes
@@ -60,7 +60,7 @@ async fn update_data(id:i64, note_content:String, pool:PgPool) -> Result<(), sql
         id
         // updated_at = NOW()
     ).execute(&pool).await?;
-
+    
     println!("ID {} 업데이트 성공", id);
     Ok(())
 }
@@ -113,6 +113,8 @@ fn Note() -> Element {
     let pool = use_context::<sqlx::PgPool>();
     let mut current_note_id = use_signal(|| None::<i64>);
     
+    let mut original_content = use_signal(|| String::new());
+
     let list_pool = pool.clone();
     let save_pool = pool.clone();
 
@@ -139,28 +141,35 @@ fn Note() -> Element {
 
     let _save_resource = use_resource(move || {
         let current_text = text_value.read().clone();
+        let old_text = original_content.read().clone(); // 원본 읽기
+
         let pool_cloned = save_pool.clone();
         // ID 시그널 자체를 넘겨서 내부에서 최신 값을 읽게 함
         let mut id_state = current_note_id;
+        let mut original_state = original_content; // 수정을 위한 캡처
 
         async move {
-            if current_text.is_empty() { return; }
+            if current_text.is_empty() || current_text == old_text { 
+                return; 
+            }
+
             tokio::time::sleep(std::time::Duration::from_millis(700)).await;
 
             // 잠에서 깨어난 직후에 '최신' ID를 읽음 (매우 중요!)
             let current_id = *id_state.read();
 
             if let Some(existing_id) = current_id {
-                if let Ok(_) = update_data(existing_id, current_text, pool_cloned).await {
+                if let Ok(_) = update_data(existing_id, &current_text, pool_cloned).await {
                     println!("업데이트 성공");
                     /* 
                         이 부분에서 로직 추가가 필요할 듯
                         바로 list_resource.restart()를 할 게 아니라 내용이 추가된데 있으면 restart()해야함
                      */
+                    original_state.set(current_text);
                     list_resource.restart(); // 리스트 갱신
                 }
             } else {
-                if let Ok(new_id) = insert_data(current_text, pool_cloned).await {
+                if let Ok(new_id) = insert_data(&current_text, pool_cloned).await {
                     println!("최초 저장 성공");
                     id_state.set(Some(new_id));
                     list_resource.restart(); // 리스트 갱신
@@ -194,6 +203,7 @@ fn Note() -> Element {
                                         사용자가 단순 클릭만 했을땐 변동이 있어선 안된다.    
                                      */
                                     text_value.set(note.content.clone());
+                                    original_content.set(note.content.clone()); // 원본 내용 백업
                                     current_note_id.set(Some(note.id));
                                 },
                                 b { "{title}" }
