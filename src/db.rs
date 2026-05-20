@@ -2,6 +2,8 @@ use dotenvy::dotenv;
 use sqlx::{PgPool, Pool, Postgres, postgres::PgPoolOptions};
 use chrono::Utc;
 
+use crate::note::NoteSummary;
+
 /// .env 파일에 작성된 환경 변수를 읽어 PostgreSQL 커넥션 풀을 생성합니다.
 /// 
 /// DB 접속 실패시 sqlx::Error를 반환합니다.
@@ -65,4 +67,23 @@ pub async fn update_data(id:i64, note_content:&str, pool:PgPool) -> Result<(), s
 
     println!("ID {} 업데이트 성공", id);
     Ok(())
+}
+
+pub async fn fetch_note_list(pool:&PgPool) -> Vec<NoteSummary> {
+            
+            sqlx::query_as!(
+                NoteSummary,
+                r#"
+                SELECT 
+                id, 
+                content, 
+                updated_at AS "updated_at!" 
+                FROM notes 
+                ORDER BY updated_at DESC
+                "#
+            )
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+
 }

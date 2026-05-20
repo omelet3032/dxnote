@@ -1,14 +1,13 @@
 use dxnote::db::*;
-use dxnote::config::screen_config;
+use dxnote::config::*;
+use dxnote::hooks::*;
 
-use dioxus::desktop::{Config};
+use dioxus::desktop::Config;
 use dioxus::prelude::*;
-use sqlx::{PgPool, Pool, Postgres};
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 #[tokio::main]
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), sqlx::Error> {
 
     let pool = connect_db().await.map_err(|e| {
@@ -35,153 +34,16 @@ fn App() -> Element {
     }
 }
 
-// 메모 하나를 표현할 구조체 (sqlx 결과와 매칭)
-#[derive(Clone, PartialEq, Debug)]
-struct NoteSummary {
-    id: i64,
-    content: String,
-    updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-fn get_list_resource () -> Resource<Vec<NoteSummary>> {
-
-   let pool = use_context::<sqlx::PgPool>();
-
-   let list_resource = use_resource(move || {
-        let pool_cloned = pool.clone();
-        async move {
-            sqlx::query_as!(
-                NoteSummary,
-                r#"
-                SELECT 
-                id, 
-                content, 
-                updated_at AS "updated_at!" 
-                FROM notes 
-                ORDER BY updated_at DESC
-                "#
-            )
-            .fetch_all(&pool_cloned)
-            .await
-            .unwrap_or_default()
-        }
-    }); 
-
-    list_resource
-}
-
-// struct SaveContext {
-//     text_value: Signal<String>,
-//     original_content: Signal<String>,
-//     current_note_id: Signal<Option<i64>>,
-//     save_pool: PgPool
-// }
-
-// fn get_save_resource (text_value:Signal<String>, original_content: Signal<String>, current_note_id:Signal<Option<i64>>, save_pool:PgPool, mut list_resource:Resource<Vec<NoteSummary>>) {
-// fn use_auto_save(text_value: Signal<String>, original_content: Signal<String>, save_pool: PgPool, current_note_id: Signal<Option<i64>>,  mut list_resource: Resource<Vec<NoteSummary>>) {
-fn use_auto_save(text_value: Signal<String>, original_content: Signal<String>, current_note_id: Signal<Option<i64>>) {
-   
-    let pool = use_context::<sqlx::PgPool>();
-    
-    use_effect(move || {
-        let current_text = text_value.read().clone();
-        let old_text = original_content.read().clone();
-
-        // 변경 없으면 실행 안함
-        if current_text.is_empty() || current_text == old_text {
-            return;
-        }
-
-        let pool_cloned = pool.clone();
-
-        let mut id_state = current_note_id;
-        let mut original_state = original_content;
-        // let mut list_resource = list_resource;
-
-        // 비동기 작업 실행
-        spawn(async move {
-            // debounce
-            tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-
-            let current_id = *id_state.read();
-
-            match current_id {
-                Some(id) => {
-                    if update_data(id, &current_text, pool_cloned).await.is_ok() {
-                        println!("업데이트 성공");
-                        original_state.set(current_text);
-                        // list_resource.restart();
-                    }
-                }
-                None => {
-                    if let Ok(new_id) = insert_data(&current_text, pool_cloned).await {
-                        println!("최초 저장 성공");
-                        id_state.set(Some(new_id));
-                        original_state.set(current_text);
-                        // list_resource.restart();
-                    }
-                }
-            }
-        });
-    });
-
-
-    // use_resource(move || {
-    //     let current_text = text_value.read().clone();
-    //     let old_text = original_content.read().clone(); // 원본 읽기
-
-    //     let pool_cloned = save_pool.clone();
-    //     // ID 시그널 자체를 넘겨서 내부에서 최신 값을 읽게 함
-    //     let mut id_state = current_note_id;
-    //     let mut original_state = original_content; // 수정을 위한 캡처
-
-    //     async move {
-    //         if current_text.is_empty() || current_text == old_text { 
-    //             return; 
-    //         }
-
-    //         tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-
-    //         // 잠에서 깨어난 직후에 '최신' ID를 읽음 (매우 중요!)
-    //         let current_id = *id_state.read();
-
-    //         if let Some(existing_id) = current_id {
-    //             if let Ok(_) = update_data(existing_id, &current_text, pool_cloned).await {
-    //                 println!("업데이트 성공");
-    //                 original_state.set(current_text);
-    //                 list_resource.restart(); // 리스트 갱신
-    //             }
-    //         } else {
-    //             if let Ok(new_id) = insert_data(&current_text, pool_cloned).await {
-    //                 println!("최초 저장 성공");
-    //                 id_state.set(Some(new_id));
-    //                 list_resource.restart(); // 리스트 갱신
-    //             }
-    //         }
-    //     }
-    // }); 
-
-
-}
 
 #[component]
 fn Note() -> Element {
-    let pool = use_context::<sqlx::PgPool>();
 
     let mut text_value = use_signal(|| String::new());
     let mut current_note_id = use_signal(|| None::<i64>);
     let mut original_content = use_signal(|| String::new());
 
-    // let save_context = SaveContext { 
-    //     text_value, 
-    //     original_content, 
-    //     current_note_id, 
-    //     save_pool 
-    // };
+    let mut list_resource = use_list_resource();
 
-    let mut list_resource = get_list_resource();
-
-    // let _ = use_auto_save(text_value, original_content, save_pool, current_note_id, list_resource);
     let _ = use_auto_save(text_value, original_content, current_note_id);
 
     use_effect(move || {
