@@ -44,7 +44,7 @@ struct NoteSummary {
 }
 
 fn get_list_resource (list_pool: Pool<Postgres>) -> Resource<Vec<NoteSummary>> {
-   let mut list_resource = use_resource(move || {
+   let list_resource = use_resource(move || {
         let pool = list_pool.clone();
         async move {
             sqlx::query_as!(
@@ -138,7 +138,6 @@ fn Note() -> Element {
 
     let _save_resource = use_auto_save(save_context, list_resource);
 
-    // list_resource.restart();
     // rsx! 앞에 아무것도 붙이지 않고 마지막 줄에 배치
     rsx! {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
