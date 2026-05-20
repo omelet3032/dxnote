@@ -43,9 +43,12 @@ struct NoteSummary {
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-fn get_list_resource (list_pool: Pool<Postgres>) -> Resource<Vec<NoteSummary>> {
+fn get_list_resource () -> Resource<Vec<NoteSummary>> {
+
+   let pool = use_context::<sqlx::PgPool>();
+
    let list_resource = use_resource(move || {
-        let pool = list_pool.clone();
+        let pool_cloned = pool.clone();
         async move {
             sqlx::query_as!(
                 NoteSummary,
@@ -58,7 +61,7 @@ fn get_list_resource (list_pool: Pool<Postgres>) -> Resource<Vec<NoteSummary>> {
                 ORDER BY updated_at DESC
                 "#
             )
-            .fetch_all(&pool)
+            .fetch_all(&pool_cloned)
             .await
             .unwrap_or_default()
         }
@@ -67,51 +70,96 @@ fn get_list_resource (list_pool: Pool<Postgres>) -> Resource<Vec<NoteSummary>> {
     list_resource
 }
 
-struct SaveContext {
-    text_value: Signal<String>,
-    original_content: Signal<String>,
-    current_note_id: Signal<Option<i64>>,
-    save_pool: PgPool
-}
+// struct SaveContext {
+//     text_value: Signal<String>,
+//     original_content: Signal<String>,
+//     current_note_id: Signal<Option<i64>>,
+//     save_pool: PgPool
+// }
 
 // fn get_save_resource (text_value:Signal<String>, original_content: Signal<String>, current_note_id:Signal<Option<i64>>, save_pool:PgPool, mut list_resource:Resource<Vec<NoteSummary>>) {
-fn use_auto_save(save_context: SaveContext, mut list_resource: Resource<Vec<NoteSummary>>) {
+// fn use_auto_save(text_value: Signal<String>, original_content: Signal<String>, save_pool: PgPool, current_note_id: Signal<Option<i64>>,  mut list_resource: Resource<Vec<NoteSummary>>) {
+fn use_auto_save(text_value: Signal<String>, original_content: Signal<String>, current_note_id: Signal<Option<i64>>) {
    
-    // let _save_resource = use_resource(move || {
-    use_resource(move || {
-        let current_text = save_context.text_value.read().clone();
-        let old_text = save_context.original_content.read().clone(); // 원본 읽기
+    let pool = use_context::<sqlx::PgPool>();
+    
+    use_effect(move || {
+        let current_text = text_value.read().clone();
+        let old_text = original_content.read().clone();
 
-        let pool_cloned = save_context.save_pool.clone();
-        // ID 시그널 자체를 넘겨서 내부에서 최신 값을 읽게 함
-        let mut id_state = save_context.current_note_id;
-        let mut original_state = save_context.original_content; // 수정을 위한 캡처
+        // 변경 없으면 실행 안함
+        if current_text.is_empty() || current_text == old_text {
+            return;
+        }
 
-        async move {
-            if current_text.is_empty() || current_text == old_text { 
-                return; 
-            }
+        let pool_cloned = pool.clone();
 
+        let mut id_state = current_note_id;
+        let mut original_state = original_content;
+        // let mut list_resource = list_resource;
+
+        // 비동기 작업 실행
+        spawn(async move {
+            // debounce
             tokio::time::sleep(std::time::Duration::from_millis(700)).await;
 
-            // 잠에서 깨어난 직후에 '최신' ID를 읽음 (매우 중요!)
             let current_id = *id_state.read();
 
-            if let Some(existing_id) = current_id {
-                if let Ok(_) = update_data(existing_id, &current_text, pool_cloned).await {
-                    println!("업데이트 성공");
-                    original_state.set(current_text);
-                    list_resource.restart(); // 리스트 갱신
+            match current_id {
+                Some(id) => {
+                    if update_data(id, &current_text, pool_cloned).await.is_ok() {
+                        println!("업데이트 성공");
+                        original_state.set(current_text);
+                        // list_resource.restart();
+                    }
                 }
-            } else {
-                if let Ok(new_id) = insert_data(&current_text, pool_cloned).await {
-                    println!("최초 저장 성공");
-                    id_state.set(Some(new_id));
-                    list_resource.restart(); // 리스트 갱신
+                None => {
+                    if let Ok(new_id) = insert_data(&current_text, pool_cloned).await {
+                        println!("최초 저장 성공");
+                        id_state.set(Some(new_id));
+                        original_state.set(current_text);
+                        // list_resource.restart();
+                    }
                 }
             }
-        }
-    }); 
+        });
+    });
+
+
+    // use_resource(move || {
+    //     let current_text = text_value.read().clone();
+    //     let old_text = original_content.read().clone(); // 원본 읽기
+
+    //     let pool_cloned = save_pool.clone();
+    //     // ID 시그널 자체를 넘겨서 내부에서 최신 값을 읽게 함
+    //     let mut id_state = current_note_id;
+    //     let mut original_state = original_content; // 수정을 위한 캡처
+
+    //     async move {
+    //         if current_text.is_empty() || current_text == old_text { 
+    //             return; 
+    //         }
+
+    //         tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+
+    //         // 잠에서 깨어난 직후에 '최신' ID를 읽음 (매우 중요!)
+    //         let current_id = *id_state.read();
+
+    //         if let Some(existing_id) = current_id {
+    //             if let Ok(_) = update_data(existing_id, &current_text, pool_cloned).await {
+    //                 println!("업데이트 성공");
+    //                 original_state.set(current_text);
+    //                 list_resource.restart(); // 리스트 갱신
+    //             }
+    //         } else {
+    //             if let Ok(new_id) = insert_data(&current_text, pool_cloned).await {
+    //                 println!("최초 저장 성공");
+    //                 id_state.set(Some(new_id));
+    //                 list_resource.restart(); // 리스트 갱신
+    //             }
+    //         }
+    //     }
+    // }); 
 
 
 }
@@ -123,20 +171,23 @@ fn Note() -> Element {
     let mut text_value = use_signal(|| String::new());
     let mut current_note_id = use_signal(|| None::<i64>);
     let mut original_content = use_signal(|| String::new());
-    let save_pool = pool.clone();
 
-    let list_pool = pool.clone();
+    // let save_context = SaveContext { 
+    //     text_value, 
+    //     original_content, 
+    //     current_note_id, 
+    //     save_pool 
+    // };
 
-    let save_context = SaveContext { 
-        text_value, 
-        original_content, 
-        current_note_id, 
-        save_pool 
-    };
+    let mut list_resource = get_list_resource();
 
-    let list_resource = get_list_resource(list_pool);
+    // let _ = use_auto_save(text_value, original_content, save_pool, current_note_id, list_resource);
+    let _ = use_auto_save(text_value, original_content, current_note_id);
 
-    let _save_resource = use_auto_save(save_context, list_resource);
+    use_effect(move || {
+        let _ = original_content.read(); // 원본 변경 감지용
+        list_resource.restart();         // 안전하게 리스트만 새로고침
+    });
 
     // rsx! 앞에 아무것도 붙이지 않고 마지막 줄에 배치
     rsx! {
@@ -154,17 +205,18 @@ fn Note() -> Element {
                             .format("%m/%d %H:%M")
                             .to_string();
                         let title = note.content.lines().next().unwrap_or("Empty");
-
+                        
                         rsx! {
                             div { 
                                 class: "note-item",
                                 onclick: move |_| {
                                     /* 
-                                        사용자가 단순 클릭만 했을땐 변동이 있어선 안된다.    
-                                     */
+                                    사용자가 단순 클릭만 했을땐 변동이 있어선 안된다.    
+                                    */
                                     text_value.set(note.content.clone());
                                     original_content.set(note.content.clone()); // 원본 내용 백업
                                     current_note_id.set(Some(note.id));
+                                    // list_resource.restart();
                                 },
                                 b { "{title}" }
                                 p { 
