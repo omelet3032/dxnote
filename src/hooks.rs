@@ -1,6 +1,6 @@
 use dioxus::core::Task;
 use dioxus::prelude::*;
-use tokio::task::JoinHandle;
+
 use crate::note::NoteSummary;
 use crate::db::{fetch_note_list, update_data, insert_data};
 
@@ -25,10 +25,10 @@ pub fn use_auto_save(text_value: Signal<String>, original_content: Signal<String
     let pool = use_context::<sqlx::PgPool>();
     
 
-    // use_effect(move || {
+    use_effect(move || {
         let current_text = text_value.read().clone();
-        // let old_text = original_content.peek().clone();
-        let old_text = original_content.read().clone();
+        let old_text = original_content.peek().clone();
+        // let old_text = original_content.read().clone();
 
         // 변경 없으면 실행 안함
         if current_text.is_empty() || current_text == old_text {
@@ -49,8 +49,12 @@ pub fn use_auto_save(text_value: Signal<String>, original_content: Signal<String
         let current_id = *id_state.read();
         // 비동기 작업 실행
         let handle = spawn(async move {
+        // spawn(async move {
+            println!("start : {}", current_text);
             // debounce
             tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+
+            println!("saving : {}", current_text);
 
             let saved = match current_id {
                 Some(id) => {
@@ -76,6 +80,6 @@ pub fn use_auto_save(text_value: Signal<String>, original_content: Signal<String
         });
 
         save_task.set(Some(handle));
-    // });
+    });
 
 }
