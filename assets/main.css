@@ -22,13 +22,15 @@ html, body {
 
 /* 메인 편집 영역 */
 .main-content {
-    flex: 1; /* 남은 공간을 모두 차지 */
+    flex: 1; 
     display: flex;
     flex-direction: column;
 }
 
+
 /* 텍스트 영역: 중요! 더이상 100vw/100vh를 사용하지 않습니다. */
 .textarea {
+
     width: 100%;
     height: 100%;
     margin: 0;

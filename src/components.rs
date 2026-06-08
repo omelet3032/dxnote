@@ -34,7 +34,6 @@ pub fn Note() -> Element {
 
 #[component]
 fn NoteList(text_value: Signal<String>, original_content: Signal<String>, current_note_id: Signal<Option<i64>>, list_resource: Resource<Vec<NoteSummary>>) -> Element { 
-// fn NoteList(text_value: Signal<String>, original_content: Signal<String>, current_note_id: Signal<Option<i64>>) -> Element { 
 
     rsx! {
            div { 
@@ -49,8 +48,25 @@ fn NoteList(text_value: Signal<String>, original_content: Signal<String>, curren
                             .format("%m/%d %H:%M")
                             .to_string();
                         
-                        let title = note.content.lines().next().unwrap_or("Empty");
+                        // 1. 공백이나 엔터를 제외하고 진짜 내용이 있는 첫 번째 줄을 찾습니다.
+                        let first_content_line = note.content
+                                                .lines()
+                                                .map(|line| line.trim())
+                                                .find(|line| !line.is_empty()); // 비어있지 않은 첫 줄을 find!
+
+                        // 2. 타이틀 결정
+                        let title = match first_content_line {
+                            Some(text) => text,            // 내용이 있는 첫 줄을 타이틀로 사용
+                            None => "새로운 메모",          // 전체가 다 비어있거나 엔터만 있을 때
+                        };
                         
+                        
+                        // let title = note.content.lines().next().unwrap_or("Empty");
+                        /* 
+                            if not.content.lines().next() == ""
+                                title = 모새로운 메모"
+                         */
+
                         rsx! {
                             div { 
                                 class: "note-item",
@@ -61,7 +77,6 @@ fn NoteList(text_value: Signal<String>, original_content: Signal<String>, curren
                                     text_value.set(note.content.clone());
                                     original_content.set(note.content.clone()); // 원본 내용 백업
                                     current_note_id.set(Some(note.id));
-                                    // list_resource.restart();
                                 },
                                 b { "{title}" }
                                 p { 
@@ -90,7 +105,7 @@ fn Textarea(text_value:Signal<String>) -> Element {
                     value: "{text_value}",
                     oninput: move |event| {
                         text_value.set(event.value());
-                        // list_resource.restart();
+                        // println!("입력값 : {}", text_value);
                     },
                 }
             }

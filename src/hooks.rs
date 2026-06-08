@@ -19,7 +19,6 @@ pub fn use_list_resource () -> Resource<Vec<NoteSummary>> {
     list_resource
 }
 
-// pub fn use_auto_save(text_value: Signal<String>, original_content: Signal<String>, current_note_id: Signal<Option<i64>>, mut list_resource: Resource<Vec<NoteSummary>>) {
 pub fn use_auto_save(text_value: Signal<String>, original_content: Signal<String>, current_note_id: Signal<Option<i64>>, mut list_resource: Resource<Vec<NoteSummary>>, mut save_task: Signal<Option<Task>>) {
    
     let pool = use_context::<sqlx::PgPool>();
@@ -28,10 +27,10 @@ pub fn use_auto_save(text_value: Signal<String>, original_content: Signal<String
     use_effect(move || {
         let current_text = text_value.read().clone();
         let old_text = original_content.peek().clone();
-        // let old_text = original_content.read().clone();
 
         // 변경 없으면 실행 안함
-        if current_text.is_empty() || current_text == old_text {
+        // if current_text.is_empty() || current_text == old_text {
+        if current_text == old_text {
             return;
         }
 
@@ -44,12 +43,10 @@ pub fn use_auto_save(text_value: Signal<String>, original_content: Signal<String
 
         let mut id_state = current_note_id;
         let mut original_state = original_content;
-        // let mut list_resource = list_resource;
 
         let current_id = *id_state.read();
         // 비동기 작업 실행
         let handle = spawn(async move {
-        // spawn(async move {
             println!("start : {}", current_text);
             // debounce
             tokio::time::sleep(std::time::Duration::from_millis(700)).await;
